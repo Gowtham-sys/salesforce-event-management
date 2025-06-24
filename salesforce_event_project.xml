@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Salesforce Event Management System Metadata Package -->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Event__c</members>
+        <members>Session__c</members>
+        <members>Speaker__c</members>
+        <members>Attendee__c</members>
+        <members>Registration__c</members>
+        <members>Feedback__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>MarkSessionFull</members>
+        <name>ApexTrigger</name>
+    </types>
+    <version>58.0</version>
+</Package>
+
+<!-- Custom Objects and Fields -->
+
+<!-- Event__c -->
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Event</label>
+    <pluralLabel>Events</pluralLabel>
+    <nameField>
+        <label>Event Name</label>
+        <type>Text</type>
+    </nameField>
+    <fields>
+        <fullName>StartDate__c</fullName>
+        <label>Start Date</label>
+        <type>Date</type>
+    </fields>
+    <fields>
+        <fullName>EndDate__c</fullName>
+        <label>End Date</label>
+        <type>Date</type>
+    </fields>
+    <fields>
+        <fullName>Location__c</fullName>
+        <label>Location</label>
+        <type>Text</type>
+    </fields>
+</CustomObject>
+
+<!-- Session__c -->
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Session</label>
+    <pluralLabel>Sessions</pluralLabel>
+    <nameField>
+        <label>Session Title</label>
+        <type>Text</type>
+    </nameField>
+    <fields>
+        <fullName>Event__c</fullName>
+        <label>Event</label>
+        <type>MasterDetail</type>
+        <referenceTo>Event__c</referenceTo>
+    </fields>
+    <fields>
+        <fullName>Speaker__c</fullName>
+        <label>Speaker</label>
+        <type>Lookup</type>
+        <referenceTo>Speaker__c</referenceTo>
+    </fields>
+    <fields>
+        <fullName>StartTime__c</fullName>
+        <label>Start Time</label>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>EndTime__c</fullName>
+        <label>End Time</label>
+        <type>DateTime</type>
+    </fields>
+</CustomObject>
+
+<!-- Speaker__c -->
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Speaker</label>
+    <pluralLabel>Speakers</pluralLabel>
+    <nameField>
+        <label>Speaker Name</label>
+        <type>Text</type>
+    </nameField>
+    <fields>
+        <fullName>Email__c</fullName>
+        <label>Email</label>
+        <type>Email</type>
+    </fields>
+    <fields>
+        <fullName>Bio__c</fullName>
+        <label>Bio</label>
+        <type>LongTextArea</type>
+    </fields>
+</CustomObject>
+
+<!-- Attendee__c -->
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Attendee</label>
+    <pluralLabel>Attendees</pluralLabel>
+    <nameField>
+        <label>Attendee Name</label>
+        <type>Text</type>
+    </nameField>
+    <fields>
+        <fullName>Email__c</fullName>
+        <label>Email</label>
+        <type>Email</type>
+    </fields>
+    <fields>
+        <fullName>RegistrationDate__c</fullName>
+        <label>Registration Date</label>
+        <type>Date</type>
+    </fields>
+</CustomObject>
+
+<!-- Registration__c -->
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Registration</label>
+    <pluralLabel>Registrations</pluralLabel>
+    <nameField>
+        <label>Registration Name</label>
+        <type>Text</type>
+    </nameField>
+    <fields>
+        <fullName>Attendee__c</fullName>
+        <label>Attendee</label>
+        <type>MasterDetail</type>
+        <referenceTo>Attendee__c</referenceTo>
+    </fields>
+    <fields>
+        <fullName>Event__c</fullName>
+        <label>Event</label>
+        <type>MasterDetail</type>
+        <referenceTo>Event__c</referenceTo>
+    </fields>
+</CustomObject>
+
+<!-- Feedback__c -->
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Feedback</label>
+    <pluralLabel>Feedbacks</pluralLabel>
+    <nameField>
+        <label>Feedback Name</label>
+        <type>Text</type>
+    </nameField>
+    <fields>
+        <fullName>Session__c</fullName>
+        <label>Session</label>
+        <type>MasterDetail</type>
+        <referenceTo>Session__c</referenceTo>
+    </fields>
+    <fields>
+        <fullName>Attendee__c</fullName>
+        <label>Attendee</label>
+        <type>Lookup</type>
+        <referenceTo>Attendee__c</referenceTo>
+    </fields>
+    <fields>
+        <fullName>Rating__c</fullName>
+        <label>Rating</label>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>Comment__c</fullName>
+        <label>Comment</label>
+        <type>LongTextArea</type>
+    </fields>
+</CustomObject>
+
+<!-- Apex Trigger: MarkSessionFull -->
+<Trigger xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>58.0</apiVersion>
+    <status>Active</status>
+    <triggerBody>
+trigger MarkSessionFull on Feedback__c (after insert, after delete) {
+    Set&lt;Id&gt; sessionIds = new Set&lt;Id&gt;();
+    for (Feedback__c fb : Trigger.isInsert ? Trigger.new : Trigger.old) {
+        sessionIds.add(fb.Session__c);
+    }
+
+    Map&lt;Id, Integer&gt; feedbackCountMap = new Map&lt;Id, Integer&gt;();
+    for (AggregateResult ar : [
+        SELECT Session__c, COUNT(Id) total 
+        FROM Feedback__c 
+        WHERE Session__c IN :sessionIds 
+        GROUP BY Session__c
+    ]) {
+        feedbackCountMap.put((Id) ar.get('Session__c'), (Integer) ar.get('total'));
+    }
+
+    List&lt;Session__c&gt; sessionsToUpdate = new List&lt;Session__c&gt;();
+    for (Id sid : sessionIds) {
+        Integer count = feedbackCountMap.get(sid);
+        if (count != null &amp;&amp; count &gt;= 50) {
+            sessionsToUpdate.add(new Session__c(Id = sid, Status__c = 'Full'));
+        }
+    }
+
+    if (!sessionsToUpdate.isEmpty()) {
+        update sessionsToUpdate;
+    }
+}
+    </triggerBody>
+</Trigger>
